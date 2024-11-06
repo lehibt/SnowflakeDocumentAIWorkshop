@@ -5,8 +5,8 @@ from snowflake.snowpark import functions as f
 from snowflake.snowpark import DataFrame
 
 # Title of page
-st.title("Pipeline check")
-st.subheader("Verify the data extracted from the documents in the pipeline via the DocumentAI model.")
+st.title("Data extraction check")
+st.subheader("Verify the data extracted from the documents in the pipeline via the Document AI model.")
 st.write(
     """This is a mini **Streamlit** application to easily
     verify the extracted information from the uploaded Documents
@@ -17,11 +17,11 @@ st.write(
 # Get the current credentials
 session = get_active_session()
 
-# Get the table the inference results are stored in to a Snowpark Dataframe
+# Get the table the inference results are stored in
 source_table = session.table("doc_ai_db.doc_ai_schema.ml_patents_headers")
 df_source = source_table.sort(f.col("inserted_dttm"), ascending=True)
 
-# Let the user input a value for filtering data to be checked by confidence score
+# Let the user input values for filtering data to be checked by confidence score
 st.divider()
 st.subheader("Score thresholds")
 st.markdown("Set threshold values for confidence scores below which data should be checked again.")
@@ -43,7 +43,7 @@ with col2:
         value=0.9
     )
 
-# Filter data frame based on user input for thresholds
+# Filter data frame based on user input for confidence thresholds
 df_source_to_check = df_source.filter(
     ((f.col("application_number_score") <= thresh_application_number_score) | (f.col("invention_title_score") <= thresh_invention_title_score))
     & (f.col("checked") == False)
@@ -52,13 +52,13 @@ df_source_not_to_check = df_source.filter(
     (f.col("application_number_score") > thresh_application_number_score) & (f.col("invention_title_score") > thresh_invention_title_score)
 )
 
-# Let user edit the data
+# Let user edit (correct) the data
 st.divider()
 st.subheader("Check data")
 st.write("This is the data to be checked (as it comes out of the model).")
 df_pd_edited = st.data_editor(df_source_to_check)
 
-# Convert back to DataFrame and filter for checked data, i.e. rows to be processed
+# Convert back to Snowpark DataFrame and filter for checked data, i.e. rows that have been marked as checked
 df_edited_checked = session.create_dataframe(df_pd_edited).filter(f.col("Checked"))
 
 # Update data on clicking the button
@@ -72,10 +72,10 @@ if st.button("Update data."):
         #[f.when_matched().delete()]
     )
 
-    # Process checked data. Write into processed table.
+    # Write checked data back to table
     df_edited_checked.write.mode("append").save_as_table("doc_ai_db.doc_ai_schema.ml_patents_headers_checked")
 
-    # Show the fully processed data
+    # Show the checked table
     st.divider()
     st.write("This is the checked data.")
     df_processed_show = session.table("doc_ai_db.doc_ai_schema.ml_patents_headers_checked").sort(f.col("inserted_dttm"), ascending=False)
